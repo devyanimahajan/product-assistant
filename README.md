@@ -85,3 +85,23 @@ result = transcribe_audio(
 print(f"Transcript: {result['text']}")
 print(f"Language: {result['language']}")
 ```
+## Quick Test ASR
+```bash
+# Option 1: Record and test
+cd ASR
+python record_audio.py test.wav 5
+
+# Option 2: Test with existing audio
+python quick_test_asr.py your_audio.wav
+```
+
+Expected output:
+```
+============================================================
+ASR QUICK TEST
+============================================================
+✅ SUCCESS
+📝 Transcript: "I need eco-friendly cleaner under fifteen dollars"
+🌍 Language: EN
+============================================================
+```
