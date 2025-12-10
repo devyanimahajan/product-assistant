@@ -1,119 +1,148 @@
-"""
-State definitions and schemas for the agentic system
-"""
-from typing import TypedDict, List, Dict, Optional, Literal
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
+from dataclasses import dataclass, asdict
+from typing import Any, Dict, List, Optional, Literal, TypedDict
 
 
-class ProductConstraints(BaseModel):
-    """Extracted constraints from user query"""
-    budget_max: Optional[float] = Field(None, description="Maximum price in USD")
-    budget_min: Optional[float] = Field(None, description="Minimum price in USD")
-    materials: List[str] = Field(default_factory=list, description="Required/preferred materials (e.g., stainless-steel, eco-friendly)")
-    brands: List[str] = Field(default_factory=list, description="Preferred brands")
-    categories: List[str] = Field(default_factory=list, description="Product categories (e.g., cleaning, kitchen)")
-    keywords: List[str] = Field(default_factory=list, description="Key search terms")
-    exclude_materials: List[str] = Field(default_factory=list, description="Materials to avoid")
-    exclude_brands: List[str] = Field(default_factory=list, description="Brands to avoid")
+# ---------- Core data models ----------
 
 
-class SafetyFlags(BaseModel):
-    """Safety and content moderation flags"""
-    is_safe: bool = Field(True, description="Overall safety check")
-    concerns: List[str] = Field(default_factory=list, description="Specific safety concerns")
-    requires_age_verification: bool = Field(False, description="Age-restricted product")
-    potentially_harmful: bool = Field(False, description="Could be used harmfully")
+@dataclass
+class ProductConstraints:
+    budget_min: Optional[float] = None
+    budget_max: Optional[float] = None
+    category: Optional[str] = None
+    brand: Optional[str] = None
+    materials_include: List[str] = None
+    materials_exclude: List[str] = None
+    eco_friendly: Optional[bool] = None
+    size: Optional[str] = None
+    query_language: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class Intent(BaseModel):
-    """Parsed user intent"""
-    query_type: Literal["product_search", "comparison", "recommendation", "availability_check"] = Field(
-        description="Type of query"
-    )
-    product_description: str = Field(description="What the user is looking for")
-    constraints: ProductConstraints = Field(default_factory=ProductConstraints)
-    safety: SafetyFlags = Field(default_factory=SafetyFlags)
-    needs_comparison: bool = Field(False, description="User wants to compare multiple options")
-    comparison_criteria: List[str] = Field(default_factory=list, description="What to compare (price, rating, ingredients)")
+@dataclass
+class SafetyFlags:
+    chemical_safety: bool = False
+    child_safety: bool = False
+    surface_safety: bool = False
+    possible_misuse: bool = False
+    needs_professional_advice: bool = False
+    other_notes: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class DataSource(BaseModel):
-    """Data source configuration"""
-    use_private: bool = Field(True, description="Query private catalog")
-    use_live: bool = Field(False, description="Query live web sources")
-    private_fields: List[str] = Field(
-        default_factory=lambda: ["title", "price", "rating", "brand"],
-        description="Fields to retrieve from private DB"
-    )
-    live_fields: List[str] = Field(
-        default_factory=lambda: ["price", "availability"],
-        description="Fields to check from live sources"
-    )
+@dataclass
+class Intent:
+    intent_type: Literal["product_search", "comparison", "chitchat", "unsafe", "unknown"]
+    constraints: ProductConstraints
+    safety_flags: SafetyFlags
+    raw_intent_json: Dict[str, Any]
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        data["constraints"] = self.constraints.to_dict()
+        data["safety_flags"] = self.safety_flags.to_dict()
+        return data
 
 
-class RetrievalPlan(BaseModel):
-    """Plan for data retrieval"""
-    data_sources: DataSource = Field(default_factory=DataSource)
-    vector_query: str = Field(description="Optimized query for vector search")
-    metadata_filters: Dict = Field(default_factory=dict, description="Filters for private catalog")
-    max_results: int = Field(5, description="Number of products to retrieve")
-    rerank: bool = Field(True, description="Apply reranking after retrieval")
-    reconcile_conflicts: bool = Field(False, description="Check for price/availability discrepancies")
+@dataclass
+class DataSourcePlan:
+    use_private: bool = True
+    use_live: bool = False
+    notes: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class ProductResult(BaseModel):
-    """Retrieved product information"""
-    sku: Optional[str] = None
+@dataclass
+class RetrievalPlan:
+    data_sources: DataSourcePlan
+    max_results: int = 5
+    rerank: bool = True
+    reconcile_conflicts: bool = True
+    filters: Dict[str, Any] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        data = asdict(self)
+        data["data_sources"] = self.data_sources.to_dict()
+        return data
+
+
+@dataclass
+class ProductResult:
+    source: Literal["private", "web"]
+    sku: str
     title: str
     price: Optional[float] = None
     rating: Optional[float] = None
     brand: Optional[str] = None
     ingredients: Optional[str] = None
-    category: Optional[str] = None
-    source: Literal["private", "live", "both"] = "private"
-    doc_id: Optional[str] = None  # For private catalog
-    url: Optional[str] = None  # For live sources
-    conflicts: List[str] = Field(default_factory=list, description="Discrepancies between sources")
+    features: Optional[List[str]] = None
+    url: Optional[str] = None
+    doc_id: Optional[str] = None
+    score: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class Citation(BaseModel):
-    """Citation for grounding"""
-    source_type: Literal["private_catalog", "web_search"]
-    reference: str  # doc_id or URL
-    snippet: str  # Supporting text
-    field: str  # Which field this supports (price, rating, etc.)
+@dataclass
+class Citation:
+    source: Literal["private", "web"]
+    doc_id: str
+    url: Optional[str] = None
+    label: Optional[str] = None
+    snippet: Optional[str] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
-class AgentState(TypedDict):
-    """
-    State passed between agents in the LangGraph workflow
-    """
-    # Input
-    user_query: str
-    transcript_timestamp: Optional[str]
-    
-    # Router outputs
-    intent: Optional[Intent]
-    
-    # Planner outputs
-    retrieval_plan: Optional[RetrievalPlan]
-    
-    # Retriever outputs
-    retrieved_products: List[ProductResult]
-    
-    # Answerer outputs
-    final_response: str
-    citations: List[Citation]
-    
-    # Logging
-    agent_logs: List[Dict]  # Each agent logs its reasoning
-    tool_calls: List[Dict]  # Track all tool invocations
-
-
-class AgentLog(BaseModel):
-    """Structured log entry for transparency"""
+@dataclass
+class AgentLog:
     agent_name: str
     timestamp: str
     reasoning: str
-    decision: Dict
-    confidence: float = Field(ge=0.0, le=1.0)
+    decision: Dict[str, Any]
+    confidence: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ToolCallLog:
+    agent_name: str
+    tool_name: str
+    arguments: Dict[str, Any]
+    timestamp: str
+    raw_response: Optional[Dict[str, Any]] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+# ---------- LangGraph state ----------
+
+
+class AgentState(TypedDict, total=False):
+    user_query: str
+    transcript: Optional[str]
+
+    intent: Optional[Intent]
+    retrieval_plan: Optional[RetrievalPlan]
+
+    retrieved_products: List[ProductResult]
+
+    final_response: Optional[str]
+    tts_summary: Optional[str]
+
+    citations: List[Citation]
+    agent_logs: List[AgentLog]
+    tool_calls: List[ToolCallLog]
