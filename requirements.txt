@@ -1,0 +1,35 @@
+# Core dependencies
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Data processing
+pandas>=2.0.0
+datasets>=2.14.0
+
+# Vector store and embeddings
+sentence-transformers>=2.2.0
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-chroma>=0.1.0
+langchain-huggingface>=0.0.1
+langchain-openai>=0.0.5
+chromadb>=0.4.0
+
+# Utilities
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# ASR - Whisper model for speech-to-text
+openai-whisper>=20231117
+
+# Audio processing - Convert MP3/M4A/etc to WAV
+pydub>=0.25.1
+
+# NumPy - Required by Whisper
+numpy>=1.24.0,<2.0.0
+
+# Note: FFmpeg is a system dependency, install separately:
+# Ubuntu/Debian: sudo apt install ffmpeg
+# macOS: brew install ffmpeg
+
+
