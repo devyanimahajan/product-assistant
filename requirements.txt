@@ -19,17 +19,12 @@ chromadb>=0.4.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# ASR - Whisper model for speech-to-text
-openai-whisper>=20231117
-
-# Audio processing - Convert MP3/M4A/etc to WAV
-pydub>=0.25.1
-
-# NumPy - Required by Whisper
-numpy>=1.24.0,<2.0.0
-
-# Note: FFmpeg is a system dependency, install separately:
-# Ubuntu/Debian: sudo apt install ffmpeg
-# macOS: brew install ffmpeg
+# TTS (SpeechT5) - Open Source, Free
+transformers>=4.30.0
+torch>=2.0.0
+torchaudio>=2.0.0
+soundfile>=0.12.1
+sentencepiece>=0.1.99  # IMPORTANT: Required for SpeechT5
+protobuf>=3.20.0       # Required for sentencepiece
 
 
