@@ -1,0 +1,11 @@
+# Requirements for ASR Component (Recording and Transcription)
+
+git+https://github.com/openai/whisper.git
+whisper-timestamped
+
+# NumPy < 2.0 is crucial to avoid the binary conflict with Numba/Whisper
+numpy<2.0
+# SciPy for saving the recorded WAV file (scipy.io.wavfile.write)
+scipy
+# Audio recording library for microphone capture (sounddevice.rec)
+sounddevice
