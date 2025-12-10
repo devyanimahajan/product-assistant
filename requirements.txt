@@ -1,0 +1,20 @@
+# Core dependencies
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# Data processing
+pandas>=2.0.0
+datasets>=2.14.0
+
+# Vector store and embeddings
+sentence-transformers>=2.2.0
+langchain>=0.1.0
+langchain-community>=0.0.10
+langchain-chroma>=0.1.0
+langchain-huggingface>=0.0.1
+langchain-openai>=0.0.5
+chromadb>=0.4.0
+
+# Utilities
+requests>=2.31.0
+python-dotenv>=1.0.0
