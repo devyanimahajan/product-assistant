@@ -20,17 +20,3 @@ Step 2: Verify Installation
 ```bash
 python -c "import transformers; import datasets; import soundfile; import torch; print('✓ All packages installed')"
 ```
-
-## Run TTS
-```bash
-# Test TTS
-python tts/test_local_tts.py
-
-# Or test directly
-python -c "from tts.local_tts import LocalTTS; tts = LocalTTS(); print('✓ TTS ready')"
-```
-Files
-
-tts/local_tts.py - TTS module
-
-agents/answerer.py - Integration with answerer agent
