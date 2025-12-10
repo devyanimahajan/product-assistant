@@ -18,3 +18,12 @@ chromadb>=0.4.0
 # Utilities
 requests>=2.31.0
 python-dotenv>=1.0.0
+
+# ASR - Whisper model for speech-to-text
+openai-whisper>=20231117
+
+# Audio processing - Convert MP3/M4A/etc to WAV
+pydub>=0.25.1
+
+# NumPy - Required by Whisper
+numpy>=1.24.0,<2.0.0
