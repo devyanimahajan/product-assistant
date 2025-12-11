@@ -19,6 +19,9 @@ chromadb>=0.4.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 
+# TTS Providers 
+openai>=1.0.0
+
 # API Keys
 OPENAI_API_KEY= your api key
 
@@ -31,5 +34,4 @@ OPENAI_TTS_VOICE=alloy
 
 # Audio Output Directory
 AUDIO_OUTPUT_DIR=./audio_output
-
 
