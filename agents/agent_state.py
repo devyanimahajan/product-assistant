@@ -175,7 +175,8 @@ class AgentState(TypedDict, total=False):
 def build_assistant_graph():
     """
     Build the LangGraph StateGraph that orchestrates:
-      router -> planner -> retriever -> answerer
+      router -> [conditional: product_search/comparison -> planner -> retriever -> answerer]
+                            [other intents -> simple_response -> END]
     """
     
     # Import here to avoid circular dependency
@@ -187,7 +188,7 @@ def build_assistant_graph():
     llm = get_llm()
     mcp = MCPHTTPClient()
 
-    # Node functions with deps injected via closures, like in the notebooks
+    # Node functions with deps injected via closures
     def router_node(state: AgentState) -> AgentState:
         return run_router(state, llm)
 
@@ -199,6 +200,39 @@ def build_assistant_graph():
 
     def answerer_node(state: AgentState) -> AgentState:
         return run_answerer(state, llm)
+    
+    def simple_response_node(state: AgentState) -> AgentState:
+        """Handle non-product intents with friendly messages."""
+        intent = state.get("intent")
+        intent_type = intent.intent_type if intent else "unknown"
+        
+        if intent_type == "chitchat":
+            message = "I'm a product recommendation assistant. I can help you find household products, compare options, and answer questions about product features. What product are you looking for?"
+        elif intent_type == "unsafe":
+            message = "I detected safety concerns in your query. For safety-related questions about chemicals or hazardous materials, please consult a professional or refer to product safety documentation."
+        elif intent_type == "unknown":
+            message = "I didn't understand your request. I help with product recommendations and comparisons for household items. Could you please rephrase your question about a specific product you're looking for?"
+        else:
+            message = "I can help you find and compare household products. What are you looking for?"
+        
+        state["final_response"] = message
+        state["tts_summary"] = message
+        state["retrieved_products"] = []
+        state["citations"] = []
+        
+        return state
+    
+    def should_retrieve_products(state: AgentState) -> str:
+        """Decide if we should retrieve products or give a simple response."""
+        intent = state.get("intent")
+        if not intent:
+            return "simple_response"
+        
+        # Only do product retrieval for product_search and comparison intents
+        if intent.intent_type in ["product_search", "comparison"]:
+            return "planner"
+        else:
+            return "simple_response"
 
     graph = StateGraph(AgentState)
 
@@ -206,13 +240,24 @@ def build_assistant_graph():
     graph.add_node("planner", planner_node)
     graph.add_node("retriever", retriever_node)
     graph.add_node("answerer", answerer_node)
+    graph.add_node("simple_response", simple_response_node)
 
     graph.set_entry_point("router")
 
-    graph.add_edge("router", "planner")
+    # Conditional routing after router
+    graph.add_conditional_edges(
+        "router",
+        should_retrieve_products,
+        {
+            "planner": "planner",
+            "simple_response": "simple_response"
+        }
+    )
+    
     graph.add_edge("planner", "retriever")
     graph.add_edge("retriever", "answerer")
     graph.add_edge("answerer", END)
+    graph.add_edge("simple_response", END)
 
     return graph.compile()
 

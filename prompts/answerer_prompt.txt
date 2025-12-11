@@ -15,17 +15,21 @@ You will receive:
 Your tasks:
 1. FOCUS ON ONE TOP PRODUCT FIRST. Present it as "My top pick is [Product Name]" or "Here are [N] options. My top pick is [Product Name]"
 2. Explain why this ONE product is best: mention budget fit, material compatibility, eco-friendliness, rating, key features
-3. THEN briefly mention you compared it with alternatives (e.g., "I compared this with two alternatives")
+3. THEN mention the OTHER alternatives. COUNT THEM CORRECTLY:
+   - If you have 3 products total → "I compared this with 2 alternatives" or "I found 3 options"
+   - If you have 5 products total → "I compared this with 4 alternatives" or "I found 5 options"
+   - Use the EXACT NUMBER of products you received, minus 1 for the top pick
 4. Add light safety notes if needed (e.g., "test on a small area first")
-5. Provide citations for the top product and alternatives
+5. Provide citations for ALL products shown (top pick + all alternatives)
 6. Create a conversational tts_summary (10-15 seconds) that:
    - States the top pick clearly
    - Mentions key details (price, rating, why it's good)
-   - Notes you found alternatives
+   - Notes you found alternatives (with CORRECT count)
    - Ends with "I've sent details to your screen" or similar
 
-EXAMPLE FORMAT:
-"Here are three options that fit your budget. My top pick is Brand X Steel-Safe Eco Cleaner—plant-based surfactants, 4.6★ average rating, typically $12.49. I compared this with two alternatives. I've sent details and sources to your screen."
+EXAMPLE FORMATS:
+- 3 products: "Here are three options that fit your budget. My top pick is Brand X Steel-Safe Eco Cleaner—plant-based surfactants, 4.6★ average rating, typically $12.49. I compared this with two alternatives. I've sent details and sources to your screen."
+- 5 products: "I found five options. My top pick is Brand X—$12.49, 4.6★ rating, eco-friendly. I compared this with four alternatives. Details are on your screen."
 
 Respond with valid JSON only:
 {

@@ -377,6 +377,7 @@
             const mediaRecorderRef = useRef(null);
             const audioChunksRef = useRef([]);
             const audioRef = useRef(null);
+            const mediaStreamRef = useRef(null);
 
             const handleVoiceButtonClick = async () => {
                 if (state === 'idle') {
@@ -387,36 +388,114 @@
             };
 
             const startRecording = async () => {
+                // Immediately clear UI and show preparing feedback
+                // These happen synchronously, so UI updates right away
+                setError(null);
+                setResponse(null);
+                setTranscript('');
+                setAgentLogs([]);
+                
+                // Set to idle temporarily to force re-render and clear old state
+                setState('idle');
+                
                 try {
+                    // Small delay to ensure state updates are processed
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                    
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaStreamRef.current = stream;
                     mediaRecorderRef.current = new MediaRecorder(stream);
                     audioChunksRef.current = [];
+
+                    // Only set recording state when actually recording starts
+                    mediaRecorderRef.current.onstart = () => {
+                        setState('recording');
+                    };
 
                     mediaRecorderRef.current.ondataavailable = (event) => {
                         audioChunksRef.current.push(event.data);
                     };
 
                     mediaRecorderRef.current.onstop = async () => {
-                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                        // Use the actual MIME type from MediaRecorder instead of forcing 'audio/wav'
+                        const mimeType = mediaRecorderRef.current.mimeType || 'audio/webm';
+                        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                         await processAudio(audioBlob);
-                        stream.getTracks().forEach(track => track.stop());
                     };
 
+                    // Start recording - onstart event will fire when ready
                     mediaRecorderRef.current.start();
-                    setState('recording');
-                    setError(null);
-                    setResponse(null);
-                    setTranscript('');
-                    setAgentLogs([]);
                 } catch (err) {
                     setError('Microphone access denied. Please allow microphone access.');
+                    setState('idle'); // Reset state on error
                 }
             };
 
             const stopRecording = () => {
                 if (mediaRecorderRef.current && state === 'recording') {
                     mediaRecorderRef.current.stop();
+                    
+                    // Stop microphone immediately to prevent macOS audio profile issues
+                    if (mediaStreamRef.current) {
+                        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                        mediaStreamRef.current = null;
+                    }
+                    
                     setState('processing');
+                }
+            };
+
+            const handleSSEEvent = (event) => {
+                console.log('[SSE Event]', event.type, event);
+                
+                switch (event.type) {
+                    case 'phase':
+                        // Could show phase updates if needed
+                        break;
+                        
+                    case 'transcript':
+                        setTranscript(event.text);
+                        break;
+                        
+                    case 'agent_complete':
+                        // Update agent logs in real-time
+                        setAgentLogs(prev => {
+                            const newLog = {
+                                agent_name: event.agent,
+                                reasoning: event.reasoning || `${event.agent} completed`,
+                                timestamp: event.timestamp
+                            };
+                            return [...prev, newLog];
+                        });
+                        break;
+                        
+                    case 'complete':
+                        // Final response received
+                        setResponse({
+                            products: event.products || [],
+                            final_response: event.final_response || '',
+                            tts_summary: event.tts_summary || '',
+                            citations: event.citations || [],
+                            agent_logs: event.agent_logs || [],
+                            intent: event.intent
+                        });
+                        
+                        if (event.audio_url) {
+                            setState('speaking');
+                            const audioUrl = `http://localhost:5001${event.audio_url}`;
+                            if (audioRef.current) {
+                                audioRef.current.src = audioUrl;
+                                audioRef.current.play();
+                            }
+                        } else {
+                            setState('idle');
+                        }
+                        break;
+                        
+                    case 'error':
+                        setError(event.message);
+                        setState('idle');
+                        break;
                 }
             };
 
@@ -434,25 +513,38 @@
                         throw new Error(`Server error: ${response.status}`);
                     }
 
-                    const data = await response.json();
+                    // Read SSE stream
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
                     
-                    setTranscript(data.transcript);
-                    setResponse(data);
-                    setAgentLogs(data.agent_logs || []);
-
-                    // Play audio if available
-                    if (data.audio_url) {
-                        setState('speaking');
-                        const audioUrl = `http://localhost:5001${data.audio_url}`;
-                        if (audioRef.current) {
-                            audioRef.current.src = audioUrl;
-                            audioRef.current.play();
+                    let buffer = '';
+                    
+                    while (true) {
+                        const {done, value} = await reader.read();
+                        
+                        if (done) break;
+                        
+                        buffer += decoder.decode(value, {stream: true});
+                        
+                        // Process complete SSE messages (separated by \n\n)
+                        const messages = buffer.split('\n\n');
+                        buffer = messages.pop() || ''; // Keep incomplete message in buffer
+                        
+                        for (const message of messages) {
+                            if (message.trim().startsWith('data: ')) {
+                                try {
+                                    const data = JSON.parse(message.substring(6));
+                                    handleSSEEvent(data);
+                                } catch (parseError) {
+                                    console.error('Failed to parse SSE message:', message, parseError);
+                                }
+                            }
                         }
-                    } else {
-                        setState('idle');
                     }
+                    
                 } catch (err) {
                     console.error('Request failed:', err);
+                    
                     if (err.message.includes('Failed to fetch') || err.message.includes('Load failed')) {
                         setError('Cannot connect to backend server. Make sure backend is running on port 5001.');
                     } else {
@@ -525,12 +617,15 @@
                             </div>
                         )}
 
-                        {agentLogs.length > 0 && (
+                        {(agentLogs.length > 0 || state === 'processing') && (
                             <>
                                 <div className="section-title">
                                     Agent Progress
                                 </div>
-                                <AgentTimeline logs={agentLogs} currentState={state} />
+                                <AgentTimeline 
+                                    logs={agentLogs} 
+                                    currentState={state}
+                                />
                             </>
                         )}
 
@@ -566,25 +661,45 @@
 
         // Agent Timeline Component
         function AgentTimeline({ logs, currentState }) {
+            const agents = [
+                { name: 'router', label: 'Router', description: 'Classifying intent and extracting constraints' },
+                { name: 'planner', label: 'Planner', description: 'Building retrieval strategy' },
+                { name: 'retriever', label: 'Retriever', description: 'Searching product catalog' },
+                { name: 'answerer', label: 'Answerer', description: 'Generating recommendation' }
+            ];
+
             const getAgentStatus = (agentName) => {
-                const hasLog = logs.some(log => log.agent_name.toLowerCase() === agentName.toLowerCase());
+                const hasLog = logs.some(log => 
+                    log.agent_name && log.agent_name.toLowerCase() === agentName.toLowerCase()
+                );
+                
                 if (hasLog) return 'completed';
-                if (currentState === 'processing') return 'active';
+                
+                // If processing, show first uncompleted as active
+                if (currentState === 'processing') {
+                    const completedAgents = logs.map(log => log.agent_name?.toLowerCase());
+                    const isFirstIncomplete = agents.findIndex(a => 
+                        !completedAgents.includes(a.name.toLowerCase())
+                    ) === agents.findIndex(a => a.name === agentName);
+                    
+                    if (isFirstIncomplete) return 'active';
+                }
+                
                 return 'pending';
             };
 
-            const agents = [
-                { name: 'Router', description: 'Classifying intent and extracting constraints' },
-                { name: 'Planner', description: 'Building retrieval strategy' },
-                { name: 'Retriever', description: 'Searching product catalog' },
-                { name: 'Answerer', description: 'Generating recommendation' }
-            ];
+            const getAgentDescription = (agent) => {
+                const log = logs.find(l => 
+                    l.agent_name && l.agent_name.toLowerCase() === agent.name.toLowerCase()
+                );
+                return log ? (log.reasoning || agent.description) : agent.description;
+            };
 
             return (
                 <div className="timeline">
                     {agents.map(agent => {
                         const status = getAgentStatus(agent.name);
-                        const log = logs.find(l => l.agent_name.toLowerCase() === agent.name.toLowerCase());
+                        const description = getAgentDescription(agent);
                         
                         return (
                             <div key={agent.name} className="timeline-item">
@@ -594,9 +709,9 @@
                                     {status === 'pending' && '○'}
                                 </div>
                                 <div className="timeline-content">
-                                    <div className="timeline-agent">{agent.name}</div>
+                                    <div className="timeline-agent">{agent.label}</div>
                                     <div className="timeline-description">
-                                        {log ? log.reasoning : agent.description}
+                                        {description}
                                     </div>
                                 </div>
                             </div>

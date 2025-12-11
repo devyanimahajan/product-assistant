@@ -57,7 +57,76 @@ def _extract_json(text: str) -> Dict[str, Any]:
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
         raise ValueError("Router: no JSON found in LLM output")
-    return json.loads(match.group(0))
+    
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        print(f"[Router] JSON parsing error: {e}")
+        print(f"[Router] Raw LLM output: {text}")
+        # Return a safe default intent for malformed JSON
+        return {
+            "intent_type": "unknown",
+            "constraints": {},
+            "safety_flags": {
+                "chemical_safety": False,
+                "child_safety": False,
+                "surface_safety": False,
+                "possible_misuse": False,
+                "needs_professional_advice": False,
+                "other_notes": "Router failed to parse LLM response"
+            }
+        }
+
+
+def _is_nonsense_query(query: str, constraints_data: Dict[str, Any]) -> bool:
+    """
+    Validate if a query classified as product_search is actually nonsense.
+    
+    Returns True if the query appears to be gibberish/nonsense.
+    """
+    query_lower = query.lower().strip()
+    
+    # Check if query is too short (less than 3 words)
+    words = query_lower.split()
+    if len(words) < 3:
+        # Short queries like "blah" or "test test" are likely nonsense
+        unique_words = set(words)
+        if len(unique_words) <= 2:  # Repetitive
+            return True
+    
+    # Check for repetitive nonsense patterns
+    nonsense_patterns = [
+        'blah', 'bla', 'test', 'asdf', 'qwer', 'xyz', 
+        '123', '1005', 'hello world', 'foo', 'bar'
+    ]
+    
+    # If query is just repetition of nonsense words
+    if all(word in nonsense_patterns for word in words):
+        return True
+    
+    # Check if all constraints are empty/null
+    has_any_constraint = any([
+        constraints_data.get("budget_min"),
+        constraints_data.get("budget_max"),
+        constraints_data.get("category"),
+        constraints_data.get("brand"),
+        constraints_data.get("materials_include"),
+        constraints_data.get("materials_exclude"),
+        constraints_data.get("eco_friendly") is not None,
+        constraints_data.get("size")
+    ])
+    
+    # If no constraints extracted and query looks repetitive/short, it's probably nonsense
+    if not has_any_constraint:
+        # Check for repetition (same word repeated)
+        if len(set(words)) < len(words) / 2:  # More than half are duplicates
+            return True
+        
+        # Check if query is just punctuation or numbers
+        if query_lower.replace(' ', '').replace('.', '').replace(',', '').isdigit():
+            return True
+    
+    return False
 
 
 def run_router(state: AgentState, llm: Any) -> AgentState:
@@ -74,6 +143,16 @@ def run_router(state: AgentState, llm: Any) -> AgentState:
 
     constraints_data = raw.get("constraints", {})
     safety_data = raw.get("safety_flags", {})
+    
+    # Validate product_search classification - override if it's nonsense
+    if raw.get("intent_type") == "product_search":
+        if _is_nonsense_query(query, constraints_data):
+            print(f"[Router] Overriding product_search to unknown - query appears to be nonsense: '{query}'")
+            raw["intent_type"] = "unknown"
+            if safety_data.get("other_notes"):
+                safety_data["other_notes"] += " | Query appears to be nonsense/gibberish"
+            else:
+                safety_data["other_notes"] = "Query appears to be nonsense/gibberish"
 
     constraints = ProductConstraints(
         budget_min=constraints_data.get("budget_min"),
