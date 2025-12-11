@@ -19,12 +19,17 @@ chromadb>=0.4.0
 requests>=2.31.0
 python-dotenv>=1.0.0
 
-# TTS (SpeechT5) - Open Source, Free
-transformers>=4.30.0
-torch>=2.0.0
-torchaudio>=2.0.0
-soundfile>=0.12.1
-sentencepiece>=0.1.99  # IMPORTANT: Required for SpeechT5
-protobuf>=3.20.0       # Required for sentencepiece
+# API Keys
+OPENAI_API_KEY= your api key
+
+# TTS Configuration
+TTS_PROVIDER=openai  
+
+# OpenAI TTS Settings
+OPENAI_TTS_MODEL=tts-1  
+OPENAI_TTS_VOICE=alloy
+
+# Audio Output Directory
+AUDIO_OUTPUT_DIR=./audio_output
 
 
