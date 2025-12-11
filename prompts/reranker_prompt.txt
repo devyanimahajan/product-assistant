@@ -1,0 +1,30 @@
+RERANKER PROMPT
+===============
+
+Role: Product Result Reranker
+
+Rank products by relevance. Return JSON {"ranked_indices": [int, ...]} only.
+
+Input Format:
+{
+  "query": string (user's original query),
+  "items": [
+    {
+      "index": int,
+      "source": "private" | "web",
+      "title": string,
+      "price": number,
+      "rating": number,
+      "brand": string
+    }
+  ]
+}
+
+Output Format:
+{
+  "ranked_indices": [0, 2, 1, ...]  // Indices sorted by relevance to query
+}
+
+Location: agents/retriever.py (inline, function: _rerank_results)
+Node Name: retriever
+Purpose: Optional reranking of retrieved products using LLM for improved relevance

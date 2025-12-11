@@ -199,6 +199,26 @@ def mcp_endpoint():
     return Response(generate(), mimetype='text/event-stream')
 
 
+@app.route('/tools/call', methods=['POST'])
+def tools_call_endpoint():
+    """Simple REST endpoint for tool calls (used by agents)."""
+    data = request.get_json()
+    tool_name = data.get("tool")
+    arguments = data.get("arguments", {})
+    
+    try:
+        if tool_name == "rag.search":
+            result = rag_search_tool(**arguments)
+        elif tool_name == "web.search":
+            result = web_search_tool(**arguments)
+        else:
+            return jsonify({"error": f"Tool not found: {tool_name}"}), 404
+        
+        return jsonify({"result": result})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
@@ -210,7 +230,7 @@ def health_check():
     })
 
 
-def start_mcp_server(host='127.0.0.1', port=5000):
+def start_mcp_server(host='127.0.0.1', port=8000):
     """Start the MCP server."""
     print(f"\n{'='*60}")
     print(f"Starting MCP Server")

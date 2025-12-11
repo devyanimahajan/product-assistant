@@ -54,10 +54,11 @@ def _retrieve_private(
 
     args = {
         "query": query,
-        "constraints": constraints,
+        "max_results": k,
         "filters": filters,
-        "k": k,
     }
+
+    print(f"[RETRIEVER] Calling rag.search with query='{query}', max_results={k}, filters={filters}")
 
     timestamp = datetime.utcnow().isoformat()
     raw_response: Dict[str, Any] | None = None
@@ -66,24 +67,35 @@ def _retrieve_private(
 
     try:
         raw_response = mcp_client.call_tool("rag.search", args)
-        items = raw_response.get("results", []) if isinstance(raw_response, dict) else raw_response
+        print(f"[RETRIEVER] MCP Response: success={raw_response.get('success')}, count={raw_response.get('count')}, has_error={'error' in raw_response}")
+        
+        # Check for errors in response
+        if isinstance(raw_response, dict) and 'error' in raw_response:
+            print(f"[RETRIEVER ERROR] {raw_response.get('error')}")
+            raw_response = {"error": raw_response.get('error')}
+        else:
+            items = raw_response.get("results", []) if isinstance(raw_response, dict) else raw_response
 
-        for item in items or []:
-            res = ProductResult(
-                source="private",
-                sku=item.get("sku") or item.get("doc_id") or "",
-                title=item.get("title", ""),
-                price=item.get("price"),
-                rating=item.get("rating"),
-                brand=item.get("brand"),
-                ingredients=item.get("ingredients"),
-                features=item.get("features") or [],
-                url=None,
-                doc_id=item.get("doc_id"),
-                score=float(item.get("score", 0.0)),
-            )
-            results.append(res)
+            for item in items or []:
+                res = ProductResult(
+                    source="private",
+                    sku=item.get("sku") or item.get("doc_id") or "",
+                    title=item.get("title", ""),
+                    price=item.get("price"),
+                    rating=item.get("rating"),
+                    brand=item.get("brand"),
+                    ingredients=item.get("ingredients"),
+                    features=item.get("features") or [],
+                    url=None,
+                    doc_id=item.get("doc_id"),
+                    score=float(item.get("score", 0.0)),
+                )
+                results.append(res)
+            
+            if results:
+                print(f"[RETRIEVER] Retrieved {len(results)} products from private catalog")
     except Exception as e:
+        print(f"[RETRIEVER ERROR] {type(e).__name__}: {e}")
         raw_response = {"error": str(e)}
 
     logs.append(

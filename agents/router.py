@@ -3,49 +3,54 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
 from agent_state import (
     AgentState,
+    Intent,
     ProductConstraints,
     SafetyFlags,
-    Intent,
     AgentLog,
 )
 
 
-SYSTEM_PROMPT = """
-You are an intent classifier and constraint extractor for a product discovery assistant.
+def _load_prompt() -> str:
+    """Load router prompt from file to avoid sync issues."""
+    prompt_file = Path(__file__).parent.parent / "prompts" / "router_prompt.txt"
+    try:
+        with open(prompt_file, 'r') as f:
+            content = f.read()
+            # Skip header lines and extract the actual prompt
+            lines = content.split('\n')
+            # Find where the actual prompt starts (after header and separator)
+            prompt_lines = []
+            skip_header = True
+            for line in lines:
+                if skip_header:
+                    # Skip until we find a line that's not a header or separator
+                    if line.strip() and not line.startswith('=') and not line.startswith('ROUTER') and not line.startswith('Role:'):
+                        skip_header = False
+                        prompt_lines.append(line)
+                else:
+                    # Stop at Location: line
+                    if line.startswith('Location:'):
+                        break
+                    prompt_lines.append(line)
+            
+            result = '\n'.join(prompt_lines).strip()
+            if result:
+                return result
+            # If we got nothing, return the whole content
+            return content.strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Router prompt file not found: {prompt_file}")
 
-Given a user query, you must output strict JSON with keys:
-{
-  "intent_type": "product_search" | "comparison" | "chitchat" | "unsafe" | "unknown",
-  "constraints": {
-    "budget_min": number or null,
-    "budget_max": number or null,
-    "category": string or null,
-    "brand": string or null,
-    "materials_include": [string],
-    "materials_exclude": [string],
-    "eco_friendly": boolean or null,
-    "size": string or null,
-    "query_language": string or null
-  },
-  "safety_flags": {
-    "chemical_safety": boolean,
-    "child_safety": boolean,
-    "surface_safety": boolean,
-    "possible_misuse": boolean,
-    "needs_professional_advice": boolean,
-    "other_notes": string or null
-  }
-}
 
-Be conservative: mark "unsafe" when the user asks for advice that could damage surfaces, harm children or pets, or risk misuse of chemicals.
-Only respond with JSON.
-"""
+# Load prompt once at module level
+SYSTEM_PROMPT = _load_prompt()
 
 
 def _extract_json(text: str) -> Dict[str, Any]:

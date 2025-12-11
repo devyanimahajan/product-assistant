@@ -30,24 +30,48 @@ class ASRFragmentProcessor:
     Handles fragment-based Speech-to-Text using the Whisper model.
     """
 
-    def __init__(self, model_name: str = DEFAULT_MODEL_NAME, device: str = "cpu"):
+    def __init__(self, model_name: str = DEFAULT_MODEL_NAME, device: str = None):
         """
-        Initializes the ASR model.
+        Initializes the ASR model with auto-device detection.
+        
+        Args:
+            model_name: Whisper model to use (default: small.en for English)
+            device: Device to use. If None, auto-detects: MPS → CUDA → CPU
         """
         self.model_name = model_name
-        self.device = device
+        
+        # Auto-detect device with priority: MPS (Apple Silicon) → CUDA (NVIDIA) → CPU
+        if device is None:
+            try:
+                import torch
+                if torch.backends.mps.is_available():
+                    self.device = "mps"
+                    print("[ASR] MPS (Apple Silicon GPU) detected")
+                elif torch.cuda.is_available():
+                    self.device = "cuda"
+                    print("[ASR] CUDA (NVIDIA GPU) detected")
+                else:
+                    self.device = "cpu"
+                    print("[ASR] Using CPU (no GPU detected)")
+            except ImportError:
+                self.device = "cpu"
+                print("[ASR] Using CPU (torch not available)")
+        else:
+            self.device = device
+        
+        print(f"[ASR] Initializing Whisper model '{self.model_name}' on device '{self.device}'...")
+        
         self.model = None
         
         if not whisper or whisper.__name__ == 'DummyASR':
             return
             
-        print(f"Initializing Whisper model '{self.model_name}' on device '{self.device}'...")
         try:
             # Load the model once during initialization
             self.model = whisper.load_model(self.model_name, device=self.device)
-            print("Whisper model loaded successfully.")
+            print(f"[ASR] Whisper model loaded successfully on {self.device}")
         except Exception as e:
-            print(f"Error loading Whisper model: {e}")
+            print(f"[ASR] Error loading Whisper model: {e}")
             self.model = None
 
     def transcribe_fragment(self, audio_file_path: str, initial_prompt: Optional[str] = CONTEXTUAL_PROMPT) -> Dict[str, Any]:

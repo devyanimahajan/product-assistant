@@ -2,16 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, List, Optional, Literal, TypedDict
+from pathlib import Path
 
 from langgraph.graph import StateGraph, END
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv(Path(__file__).parent.parent / '.env')
 
 from llm_factory import get_llm
 from mcp_client import MCPHTTPClient
 
-from router import run_router
-from planner import run_planner
-from retriever import run_retriever
-from answerer import run_answerer
+# Lazy imports to avoid circular dependency
+# from router import run_router
+# from planner import run_planner
+# from retriever import run_retriever
+# from answerer import run_answerer
 
 
 # ---------- Core data models ----------
@@ -171,6 +177,12 @@ def build_assistant_graph():
     Build the LangGraph StateGraph that orchestrates:
       router -> planner -> retriever -> answerer
     """
+    
+    # Import here to avoid circular dependency
+    from router import run_router
+    from planner import run_planner
+    from retriever import run_retriever
+    from answerer import run_answerer
 
     llm = get_llm()
     mcp = MCPHTTPClient()

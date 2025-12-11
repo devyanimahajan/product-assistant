@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -15,37 +16,38 @@ from agent_state import (
 )
 
 
-SYSTEM_PROMPT = """
-You are a product recommendation assistant for household and related products.
+def _load_prompt() -> str:
+    """Load answerer prompt from file to avoid sync issues."""
+    prompt_file = Path(__file__).parent.parent / "prompts" / "answerer_prompt.txt"
+    try:
+        with open(prompt_file, 'r') as f:
+            content = f.read()
+            # Skip header lines and extract the actual prompt
+            lines = content.split('\n')
+            prompt_lines = []
+            skip_header = True
+            for line in lines:
+                if skip_header:
+                    # Skip until we find actual prompt content
+                    if line.strip() and not line.startswith('=') and not line.startswith('ANSWERER') and not line.startswith('Role:'):
+                        skip_header = False
+                        prompt_lines.append(line)
+                else:
+                    # Stop at Location: line
+                    if line.startswith('Location:'):
+                        break
+                    prompt_lines.append(line)
+            
+            result = '\n'.join(prompt_lines).strip()
+            if result:
+                return result
+            return content.strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Answerer prompt file not found: {prompt_file}")
 
-You will receive:
-- user_query: the original user request
-- constraints: structured constraints (budget, eco_friendly, brand, etc.)
-- products: a list of candidate products. Each has:
-  - source: "private" or "web"
-  - sku, title, price, rating, brand, ingredients, url, doc_id
 
-Your tasks:
-1. Select the top 1 to 3 products that best match the query and constraints.
-2. Explain clearly why the top product is recommended, mentioning budget, material compatibility, eco friendliness, and rating if available.
-3. Add light safety notes if needed, for example "avoid mixing with bleach" or "test on a small area first".
-4. Provide citations mapping to:
-   - private: use doc_id as private document id
-   - web: use the url as the source link
-5. Produce a brief tts_summary that can be spoken in about 10 to 15 seconds.
-
-Respond with valid JSON only, with this shape:
-{
-  "recommendation": string,
-  "tts_summary": string,
-  "citations": [
-    {"source": "private" | "web", "doc_id": string, "url": string or null, "label": string or null, "snippet": string or null}
-  ],
-  "reasoning": string,
-  "safety_warnings": [string],
-  "confidence": number between 0 and 1
-}
-"""
+# Load prompt once at module level
+SYSTEM_PROMPT = _load_prompt()
 
 
 def _extract_json(text: str) -> Dict[str, Any]:

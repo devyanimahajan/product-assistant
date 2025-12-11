@@ -34,10 +34,9 @@ def get_vector_db():
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         
-        # Load Chroma index
+        # Load Chroma index  
         persist_dir = os.path.join(
             Path(__file__).parent.parent,
-            "data",
             "chroma_product_catalog"
         )
         
@@ -99,8 +98,9 @@ def rag_search_tool(
                 })
             
             if 'category' in filters and filters['category']:
+                # Use $eq instead of $contains for exact match
                 where_conditions.append({
-                    "category": {"$contains": filters['category']}
+                    "category": {"$eq": filters['category']}
                 })
             
             # Combine conditions with AND

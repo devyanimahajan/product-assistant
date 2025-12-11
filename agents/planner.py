@@ -22,17 +22,22 @@ def _should_use_live(user_query: str) -> bool:
 
 
 def _build_filters(intent: Any | None) -> Dict[str, Any]:
+    """Build filters that are supported by rag_tool.
+    
+    Note: Only brand filter is used. Category matching is unreliable due to
+    nested category structures in the database (e.g., "Toys & Games | Hobbies | Paints").
+    Semantic search via embeddings handles category/type matching better.
+    """
     filters: Dict[str, Any] = {}
     if intent is None:
         return filters
 
     constraints = intent.constraints
-    if constraints.category:
-        filters["category"] = constraints.category
+    # Only use brand filter - it's more reliable for exact matches
     if constraints.brand:
         filters["brand"] = constraints.brand
-    if constraints.eco_friendly is True:
-        filters["eco_friendly"] = True
+    
+    # Category and eco_friendly not used - semantic search handles these better
     return filters
 
 

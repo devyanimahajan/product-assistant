@@ -1,3 +1,10 @@
 .env
 *.pyc
+*.log
 /data/chroma_product_catalog
+/tests/test_audio
+/test_audio
+/memory-bank
+.DS_Store
+/backend/audio_output
+/chroma_product_catalog

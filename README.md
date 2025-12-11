@@ -1,38 +1,28 @@
-# product-assistant
+# Voice-to-Voice Product Assistant
 
-## Setup
+## Setup (One-time)
+
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-cp .env.example .env  # Add your BRAVE_API_KEY
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your API keys: OPENAI_API_KEY, BRAVE_API_KEY
+
+# Build vector database
 python data/build_chroma.py
 ```
-## Start MCP Server
+
+## Run (Every time)
+
 ```bash
+# Terminal 1: Start MCP Server
 python mcp_server/server.py
-```
 
-## TTS Setup
-Step 1: Install Dependencies
-```bash
-# OpenAI
-pip install openai>=1.0.0
-```
-Step 2. Configure API Keys
+# Terminal 2: Start Backend API (wait 5-6s for models to load)
+python backend/app.py
 
-Copy and configure the environment file:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` with your credentials:
-
-```bash
-# Choose provider
-TTS_PROVIDER=openai 
-
-# OpenAI (default)
-OPENAI_API_KEY=sk-...
-OPENAI_TTS_MODEL=tts-1  
-OPENAI_TTS_VOICE=alloy
+# Terminal 3: Open Frontend
+open frontend/index.html
 ```
