@@ -14,9 +14,25 @@ python mcp_server/server.py
 ## TTS Setup
 Step 1: Install Dependencies
 ```bash
-pip install transformers datasets soundfile torch torchaudio
+# OpenAI
+pip install openai>=1.0.0
 ```
-Step 2: Verify Installation
+Step 2. Configure API Keys
+
+Copy and configure the environment file:
+
 ```bash
-python -c "import transformers; import datasets; import soundfile; import torch; print('✓ All packages installed')"
+cp .env.example .env
+```
+
+Edit `.env` with your credentials:
+
+```bash
+# Choose provider
+TTS_PROVIDER=openai 
+
+# OpenAI (default)
+OPENAI_API_KEY=sk-...
+OPENAI_TTS_MODEL=tts-1  
+OPENAI_TTS_VOICE=alloy
 ```
