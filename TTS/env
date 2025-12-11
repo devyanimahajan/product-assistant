@@ -1,0 +1,12 @@
+# API Key
+OPENAI_API_KEY=your api key
+
+# TTS Configuration
+TTS_PROVIDER=openai
+
+# OpenAI TTS Settings
+OPENAI_TTS_MODEL=tts-1 
+OPENAI_TTS_VOICE=alloy
+
+# Audio Output Directory
+AUDIO_OUTPUT_DIR=./audio_output
