@@ -378,6 +378,27 @@
             const audioChunksRef = useRef([]);
             const audioRef = useRef(null);
             const mediaStreamRef = useRef(null);
+            const preloadedStreamRef = useRef(null);
+
+            // Pre-warm microphone on page load for instant recording
+            useEffect(() => {
+                console.log('[MIC] Pre-warming microphone...');
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        preloadedStreamRef.current = stream;
+                        console.log('[MIC] Microphone pre-warmed and ready!');
+                    })
+                    .catch(err => {
+                        console.log('[MIC] Pre-warm failed (will request on click):', err.message);
+                    });
+                
+                // Cleanup on unmount
+                return () => {
+                    if (preloadedStreamRef.current) {
+                        preloadedStreamRef.current.getTracks().forEach(track => track.stop());
+                    }
+                };
+            }, []);
 
             const handleVoiceButtonClick = async () => {
                 if (state === 'idle') {
@@ -388,28 +409,35 @@
             };
 
             const startRecording = async () => {
-                // Immediately clear UI and show preparing feedback
-                // These happen synchronously, so UI updates right away
+                console.log('[MIC] [1] Button clicked at', new Date().toISOString());
+                
+                // Immediately clear UI
                 setError(null);
                 setResponse(null);
                 setTranscript('');
                 setAgentLogs([]);
                 
-                // Set to idle temporarily to force re-render and clear old state
-                setState('idle');
-                
                 try {
-                    // Small delay to ensure state updates are processed
-                    await new Promise(resolve => setTimeout(resolve, 10));
+                    let stream;
                     
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    // Use pre-warmed stream if available
+                    if (preloadedStreamRef.current) {
+                        console.log('[MIC] [2] Using pre-warmed microphone stream');
+                        stream = preloadedStreamRef.current;
+                        preloadedStreamRef.current = null; // Clear so it's not reused
+                    } else {
+                        console.log('[MIC] [2] Requesting new microphone access...');
+                        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    }
+                    console.log('[MIC] [3] Got media stream at', new Date().toISOString());
+                    
                     mediaStreamRef.current = stream;
                     mediaRecorderRef.current = new MediaRecorder(stream);
                     audioChunksRef.current = [];
 
-                    // Only set recording state when actually recording starts
+                    // Log when recording actually starts (for diagnostics)
                     mediaRecorderRef.current.onstart = () => {
-                        setState('recording');
+                        console.log('[MIC] [5] MediaRecorder.onstart fired at', new Date().toISOString());
                     };
 
                     mediaRecorderRef.current.ondataavailable = (event) => {
@@ -417,14 +445,20 @@
                     };
 
                     mediaRecorderRef.current.onstop = async () => {
+                        console.log('[MIC] [6] MediaRecorder.onstop fired');
                         // Use the actual MIME type from MediaRecorder instead of forcing 'audio/wav'
                         const mimeType = mediaRecorderRef.current.mimeType || 'audio/webm';
                         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
                         await processAudio(audioBlob);
                     };
 
-                    // Start recording - onstart event will fire when ready
+                    // Start recording and immediately show recording state
+                    console.log('[MIC] [4] Calling mediaRecorder.start() at', new Date().toISOString());
                     mediaRecorderRef.current.start();
+                    
+                    // Set to recording immediately - don't wait for onstart callback
+                    setState('recording');
+                    console.log('[MIC] [4b] State set to recording immediately');
                 } catch (err) {
                     setError('Microphone access denied. Please allow microphone access.');
                     setState('idle'); // Reset state on error
@@ -551,15 +585,43 @@
                         setError(err.message);
                     }
                     setState('idle');
+                    
+                    // Re-warm microphone even on error
+                    if (!preloadedStreamRef.current) {
+                        console.log('[MIC] Re-warming microphone after error...');
+                        navigator.mediaDevices.getUserMedia({ audio: true })
+                            .then(stream => {
+                                preloadedStreamRef.current = stream;
+                                console.log('[MIC] Microphone re-warmed!');
+                            })
+                            .catch(err => {
+                                console.log('[MIC] Re-warm failed:', err.message);
+                            });
+                    }
                 }
             };
 
             const handleAudioEnded = () => {
                 setState('idle');
+                
+                // Re-warm microphone for next query
+                if (!preloadedStreamRef.current) {
+                    console.log('[MIC] Re-warming microphone for next query...');
+                    navigator.mediaDevices.getUserMedia({ audio: true })
+                        .then(stream => {
+                            preloadedStreamRef.current = stream;
+                            console.log('[MIC] Microphone re-warmed!');
+                        })
+                        .catch(err => {
+                            console.log('[MIC] Re-warm failed:', err.message);
+                        });
+                }
             };
 
             const getButtonContent = () => {
                 switch (state) {
+                    case 'preparing':
+                        return { icon: '⏳', text: 'Preparing...' };
                     case 'recording':
                         return { icon: '🎤', text: 'Recording...' };
                     case 'processing':
@@ -584,7 +646,7 @@
                             <button 
                                 className={`voice-button ${state}`}
                                 onClick={handleVoiceButtonClick}
-                                disabled={state === 'processing' || state === 'speaking'}
+                                disabled={state === 'processing' || state === 'speaking' || state === 'preparing'}
                             >
                                 <div className="voice-button-icon">{buttonContent.icon}</div>
                                 <div className="voice-button-text">{buttonContent.text}</div>
@@ -592,6 +654,7 @@
                             
                             <div className="status-text">
                                 {state === 'idle' && 'Click the button to start your query'}
+                                {state === 'preparing' && 'Setting up microphone...'}
                                 {state === 'recording' && 'Speak now... Click again to stop'}
                                 {state === 'processing' && 'Processing your request...'}
                                 {state === 'speaking' && 'Playing response...'}
@@ -765,7 +828,14 @@
                                 </div>
                             )}
                             
-                            {product.doc_id && (
+                            {product.source === 'web' && product.url ? (
+                                <div className="citation">
+                                    <a href={product.url} target="_blank" rel="noopener noreferrer" 
+                                       style={{ color: '#667eea', textDecoration: 'underline' }}>
+                                        View on retailer site →
+                                    </a>
+                                </div>
+                            ) : product.doc_id && (
                                 <div className="citation">
                                     From our catalog
                                 </div>

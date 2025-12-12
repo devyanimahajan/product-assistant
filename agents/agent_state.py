@@ -29,6 +29,7 @@ class ProductConstraints:
     budget_max: Optional[float] = None
     category: Optional[str] = None
     brand: Optional[str] = None
+    product_name: Optional[str] = None  # Extracted product name for web search
     materials_include: List[str] | None = None
     materials_exclude: List[str] | None = None
     eco_friendly: Optional[bool] = None

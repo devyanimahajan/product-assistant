@@ -159,6 +159,7 @@ def run_router(state: AgentState, llm: Any) -> AgentState:
         budget_max=constraints_data.get("budget_max"),
         category=constraints_data.get("category"),
         brand=constraints_data.get("brand"),
+        product_name=constraints_data.get("product_name"),
         materials_include=constraints_data.get("materials_include") or [],
         materials_exclude=constraints_data.get("materials_exclude") or [],
         eco_friendly=constraints_data.get("eco_friendly"),

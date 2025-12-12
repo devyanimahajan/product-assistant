@@ -249,6 +249,12 @@ def web_search_tool(
         
         # Add warning if no prices found
         if len(results_with_price) == 0:
+            print(f"[web.search] WARNING: No products found with prices out of {len(web_results)} results")
+            print(f"[web.search] Sample titles without prices:")
+            for i, item in enumerate(web_results[:3], 1):
+                print(f"  {i}. {item.get('title', 'N/A')}")
+                print(f"     Snippet: {item.get('description', 'N/A')[:100]}...")
+            
             result_data["warning"] = (
                 "Unable to find specific product pages with prices. "
                 "Try narrowing your search to specific product names or brands instead of general categories."

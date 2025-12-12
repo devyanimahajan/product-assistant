@@ -96,7 +96,8 @@ class ASRFragmentProcessor:
                 audio_file_path, 
                 language=None, 
                 initial_prompt=initial_prompt,
-                verbose=False
+                verbose=False,
+                vad=False  # Disable voice activity detection to prevent audio trimming
             )
             
             # Extract full transcript, segment timestamps, and detected language

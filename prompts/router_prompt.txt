@@ -24,6 +24,21 @@ INTENT CLASSIFICATION RULES:
 
 5. "unsafe" - Requests that could cause harm or damage
 
+CONSTRAINT EXTRACTION RULES:
+
+- **product_name**: Extract the specific product being asked about. Remove question words.
+  Examples:
+  - "What is the price of Fisher Price Think and Learn toy?" → "Fisher Price Think and Learn toy"
+  - "Where can I buy Orchard toys game?" → "Orchard toys game"
+  - "Find me eco-friendly cleaner" → "eco-friendly cleaner"
+  - For general searches ("I need a cleaner"), leave as null
+
+- **brand**: Extract brand name if mentioned explicitly
+  Examples: "Fisher-Price", "EcoClean", "Crayola"
+
+- **category**: Extract product category/type
+  Examples: "toys", "cleaner", "plates", "party supplies"
+
 Given a user query, you must output strict JSON with keys:
 {
   "intent_type": "product_search" | "comparison" | "chitchat" | "unsafe" | "unknown",
@@ -32,6 +47,7 @@ Given a user query, you must output strict JSON with keys:
     "budget_max": number or null,
     "category": string or null,
     "brand": string or null,
+    "product_name": string or null,
     "materials_include": [string],
     "materials_exclude": [string],
     "eco_friendly": boolean or null,

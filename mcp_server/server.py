@@ -206,16 +206,32 @@ def tools_call_endpoint():
     tool_name = data.get("tool")
     arguments = data.get("arguments", {})
     
+    print(f"\n[MCP] Tool call: {tool_name}")
+    print(f"[MCP] Arguments: {arguments}")
+    
     try:
         if tool_name == "rag.search":
             result = rag_search_tool(**arguments)
         elif tool_name == "web.search":
+            print(f"[MCP] Calling web_search_tool...")
             result = web_search_tool(**arguments)
+            print(f"[MCP] web_search_tool returned: success={result.get('success')}, count={result.get('count', 0)}")
         else:
+            print(f"[MCP ERROR] Tool not found: {tool_name}")
             return jsonify({"error": f"Tool not found: {tool_name}"}), 404
         
         return jsonify({"result": result})
     except Exception as e:
+        print(f"\n[MCP ERROR] Exception in tools_call_endpoint:")
+        print(f"[MCP ERROR] Tool: {tool_name}")
+        print(f"[MCP ERROR] Arguments: {arguments}")
+        print(f"[MCP ERROR] Error: {type(e).__name__}: {e}")
+        
+        # Print full stack trace
+        import traceback
+        print(f"[MCP ERROR] Stack trace:")
+        traceback.print_exc()
+        
         return jsonify({"error": str(e)}), 500
 
 

@@ -25,12 +25,43 @@ def _extract_json(text: str) -> Dict[str, Any]:
 
 
 def _construct_web_query(query: str, constraints: Dict[str, Any]) -> str:
-    parts = [query]
+    """
+    Build optimized web search query using LLM-extracted constraints.
+    
+    Uses structured fields extracted by Router LLM:
+    - brand: "Fisher-Price"
+    - product_name: "Think and Learn toy"
+    - category: "toys"
+    
+    Builds: "Fisher-Price Think and Learn toy toys price buy"
+    """
+    parts = []
+    
+    # Add brand first if available (helps with product disambiguation)
     if constraints.get("brand"):
         parts.append(str(constraints["brand"]))
+    
+    # Add LLM-extracted product name (preferred over regex)
+    if constraints.get("product_name"):
+        parts.append(str(constraints["product_name"]))
+    
+    # Add category if available and not already in product name
     if constraints.get("category"):
-        parts.append(str(constraints["category"]))
-    return " ".join(parts)
+        category = str(constraints["category"])
+        product_name = constraints.get("product_name", "").lower()
+        if category.lower() not in product_name:
+            parts.append(category)
+    
+    # Build final query
+    search_query = " ".join(parts)
+    
+    # Add shopping keywords if not present
+    if search_query and 'buy' not in search_query.lower() and 'price' not in search_query.lower():
+        search_query += " price buy"
+    
+    print(f"[RETRIEVER] Web search query: '{search_query}' (from constraints)")
+    
+    return search_query
 
 
 def _extract_price(item: Dict[str, Any]) -> Optional[float]:
@@ -119,7 +150,7 @@ def _retrieve_web(
     k = plan.max_results if plan else 5
 
     search_query = _construct_web_query(query, constraints)
-    args = {"query": search_query, "k": k}
+    args = {"query": search_query, "max_results": k}
 
     timestamp = datetime.utcnow().isoformat()
     raw_response: Dict[str, Any] | None = None
