@@ -1,0 +1,23 @@
+PRODUCT PARAMETER EXTRACTION PROMPT
+====================================
+
+Extract concise search parameters from this product for web search:
+
+Brand: {brand}
+Full Title: {title}
+
+Return JSON with:
+- product_name: Essential 2-5 word product name (remove marketing text, age ranges, dimensions)
+- category: Product type in 1-2 words (toys, art supplies, cleaning products, etc.)
+
+Examples:
+Input: "Melissa & Doug Scratch Art Box of Rainbow Mini Notes - The Original (Arts & Crafts, Wooden Stylus, 125 Count...)"
+Output: {{"product_name": "Scratch Art Rainbow Notes", "category": "art supplies"}}
+
+Input: "Melissa & Doug Magic in a Snap! Hocus Pocus Collection Magic Tricks Set (Professional Caliber Tricks...)"
+Output: {{"product_name": "Magic Snap Hocus Pocus", "category": "magic tricks"}}
+
+Return ONLY valid JSON, no explanation.
+
+Location: agents/retriever.py (used in _extract_product_search_params)
+Purpose: Extract clean search parameters from catalog products for web reconciliation

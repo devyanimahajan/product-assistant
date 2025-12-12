@@ -9,9 +9,11 @@ INTENT CLASSIFICATION RULES:
 
 1. "product_search" - If the user is asking about products in any of these ways:
    - Product recommendations: "I need a cleaner", "recommend a paint", "what's a good vacuum"
+   - Gift ideas: "gift ideas for kids", "good gifts for a 5 year old", "what should I get for"
    - Product information: "what is the price of X", "tell me about X product", "find X product"
    - Product availability: "is X in stock", "where can I buy X", "current price of X"
-   Examples: "I need a cleaner", "what's the price of Fisher Price toy", "find eco-friendly cleaner"
+   - General shopping: "toys under $30", "cleaning supplies", "art supplies for kids"
+   Examples: "I need a cleaner", "kids gift ideas", "toys for 5 year olds", "what's the price of Fisher Price toy"
 
 2. "comparison" - User wants to compare specific products or brands
 
@@ -64,8 +66,9 @@ Given a user query, you must output strict JSON with keys:
   }
 }
 
-CRITICAL: Be conservative with "product_search" - only use it when the user is CLEARLY asking for product help.
-If you're unsure or the query is gibberish, use "unknown".
+IMPORTANT: Default to "product_search" for ANY shopping, gift, or product-related query.
+Only use "chitchat" for greetings/thanks, "unknown" for gibberish, and "unsafe" for dangerous requests.
+When in doubt between "product_search" and "chitchat", choose "product_search".
 Only respond with JSON. NO text before or after the JSON.
 
 Location: agents/router.py

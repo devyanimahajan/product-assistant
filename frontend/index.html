@@ -710,7 +710,7 @@
 
                         {!transcript && !error && state === 'idle' && (
                             <div className="empty-state">
-                                <div className="empty-state-icon">🎯</div>
+                                <div className="empty-state-icon"></div>
                                 <p>Click the button above and ask about products</p>
                                 <p style={{ fontSize: '14px', marginTop: '10px' }}>
                                     Try: "Find me an eco-friendly cleaner under $15"
@@ -805,9 +805,13 @@
                         <div key={index} className="product-card">
                             <div className="product-header">
                                 <div className="product-title">{product.title}</div>
-                                {product.price && (
+                                {(product.price || product.web_price) && (
                                     <div className="product-price">
-                                        ${typeof product.price === 'number' ? product.price.toFixed(2) : product.price}
+                                        ${(() => {
+                                            // Prioritize web_price (reconciled live price) over catalog price
+                                            const displayPrice = product.web_price || product.price;
+                                            return typeof displayPrice === 'number' ? displayPrice.toFixed(2) : displayPrice;
+                                        })()}
                                     </div>
                                 )}
                             </div>
@@ -828,16 +832,16 @@
                                 </div>
                             )}
                             
-                            {product.source === 'web' && product.url ? (
+                            {product.purchase_url ? (
                                 <div className="citation">
-                                    <a href={product.url} target="_blank" rel="noopener noreferrer" 
-                                       style={{ color: '#667eea', textDecoration: 'underline' }}>
-                                        View on retailer site →
+                                    <a href={product.purchase_url} target="_blank" rel="noopener noreferrer" 
+                                       style={{ color: '#667eea', textDecoration: 'underline', fontWeight: '500' }}>
+                                        Buy online →
                                     </a>
                                 </div>
                             ) : product.doc_id && (
-                                <div className="citation">
-                                    From our catalog
+                                <div className="citation" style={{ fontSize: '11px', color: '#999' }}>
+                                    Estimated cost (current prices may vary)
                                 </div>
                             )}
                         </div>

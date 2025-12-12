@@ -104,6 +104,8 @@ class ProductResult:
     url: Optional[str] = None
     doc_id: Optional[str] = None
     score: float = 0.0
+    purchase_url: Optional[str] = None  # Reconciled web purchase link for catalog products
+    web_price: Optional[float] = None   # Current web price if different from catalog
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

@@ -9,17 +9,30 @@ You will receive:
 - user_query: the original user request
 - constraints: structured constraints (budget, eco_friendly, brand, etc.)
 - products: a list of candidate products. Each has:
-  - source: "private" or "web"
-  - sku, title, price, rating, brand, ingredients, url, doc_id
+  - source: "private" (from our catalog)
+  - sku, title, price, rating, brand, ingredients, doc_id
+  - purchase_url: live web link to buy this product (if found)
+  - web_price: current online price (ALWAYS use this if available)
 
 Your tasks:
 1. FOCUS ON ONE TOP PRODUCT FIRST. Present it as "My top pick is [Product Name]" or "Here are [N] options. My top pick is [Product Name]"
-2. Explain why this ONE product is best: mention budget fit, material compatibility, eco-friendliness, rating, key features
-3. RECONCILE PRICE CONFLICTS: If the same product (by brand/title similarity) appears from BOTH sources with different prices:
-   - Mention both prices: "Our catalog shows $12.99, but I found it online for $13.49 today"
-   - Explain the discrepancy briefly: "current online pricing may include shipping" or "catalog pricing is from 2020"
-   - This demonstrates you cross-checked sources
-4. THEN mention the OTHER alternatives. COUNT THEM CORRECTLY:
+
+2. CRITICAL - PRICE HANDLING:
+   - If product has web_price: Use ONLY web_price. Ignore the catalog price field completely.
+   - If no web_price: Use catalog price
+   - NEVER mention "catalog price", "web price", "different prices", or price discrepancies
+   - CORRECT: "priced at $13.49"
+   - WRONG: "catalog shows $12.99", "web price is $13.49", "price from our catalog is $X"
+   - Present ONE price with confidence, as if it's the only price that exists
+
+3. Explain why this ONE product is best: mention budget fit, material compatibility, eco-friendliness, rating, key features
+
+4. MENTION PURCHASE AVAILABILITY: If product has purchase_url, mention you found a link:
+   - "I've found where you can buy it online"
+   - "You can purchase it at the link I've sent to your screen"
+   - DO NOT mention price discrepancies or catalog vs web pricing
+
+5. THEN mention the OTHER alternatives. COUNT THEM CORRECTLY:
    - If you have 3 products total → "I compared this with 2 alternatives" or "I found 3 options"
    - If you have 5 products total → "I compared this with 4 alternatives" or "I found 5 options"
    - Use the EXACT NUMBER of products you received, minus 1 for the top pick
@@ -51,4 +64,4 @@ Location: agents/answerer.py
 Node Name: answerer
 Purpose: Final node in LangGraph workflow - synthesizes grounded recommendations with citations and TTS summary
 
-Updated: 2025-12-10 - Changed to focus on ONE top product first, matching assignment example format
+Updated: 2025-12-12 - Implements TRUE RECONCILIATION: catalog products enriched with live purchase links

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -15,6 +16,41 @@ from agent_state import (
     RetrievalPlan,
 )
 from mcp_client import MCPHTTPClient
+
+
+def _load_prompt(filename: str) -> str:
+    """Load prompt from file to avoid sync issues."""
+    prompt_file = Path(__file__).parent.parent / "prompts" / filename
+    try:
+        with open(prompt_file, 'r') as f:
+            content = f.read()
+            # Skip header lines and extract the actual prompt
+            lines = content.split('\n')
+            prompt_lines = []
+            skip_header = True
+            for line in lines:
+                if skip_header:
+                    # Skip until we find actual prompt content
+                    if line.strip() and not line.startswith('=') and not any(line.startswith(h) for h in ['RERANKER', 'PRODUCT', 'Role:']):
+                        skip_header = False
+                        prompt_lines.append(line)
+                else:
+                    # Stop at Location: line
+                    if line.startswith('Location:'):
+                        break
+                    prompt_lines.append(line)
+            
+            result = '\n'.join(prompt_lines).strip()
+            if result:
+                return result
+            return content.strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Prompt file not found: {prompt_file}")
+
+
+# Load prompts once at module level
+RERANKER_PROMPT = _load_prompt("reranker_prompt.txt")
+PRODUCT_PARAM_EXTRACTION_PROMPT = _load_prompt("product_param_extraction_prompt.txt")
 
 
 def _extract_json(text: str) -> Dict[str, Any]:
@@ -214,9 +250,7 @@ def _rerank_results(
 
     response = llm.invoke(
         [
-            SystemMessage(
-                content="Rank products by relevance. Return JSON {\"ranked_indices\": [int, ...]} only."
-            ),
+            SystemMessage(content=RERANKER_PROMPT),
             HumanMessage(content=json.dumps(payload, indent=2)),
         ]
     )
@@ -238,12 +272,101 @@ def _rerank_results(
     return ordered or results
 
 
+def _extract_product_search_params(product: ProductResult, llm: Any) -> Dict[str, Any]:
+    """
+    Use LLM to extract structured search parameters from a catalog product.
+    Returns constraints dict compatible with _construct_web_query().
+    """
+    # Format the prompt template with product details
+    prompt = PRODUCT_PARAM_EXTRACTION_PROMPT.format(
+        brand=product.brand or 'Unknown',
+        title=product.title
+    )
+
+    try:
+        response = llm.invoke([HumanMessage(content=prompt)])
+        # Try to extract JSON from response
+        content = response.content.strip()
+        
+        # Remove markdown code blocks if present
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        
+        data = json.loads(content.strip())
+        
+        return {
+            "brand": product.brand,
+            "product_name": data.get("product_name", ""),
+            "category": data.get("category", "")
+        }
+    except Exception as e:
+        print(f"[RETRIEVER] LLM extraction failed: {e}, using fallback")
+        # Fallback: use first 5 words of title
+        words = product.title.split()[:5]
+        return {
+            "brand": product.brand,
+            "product_name": " ".join(words),
+            "category": ""
+        }
+
+
+def _find_best_web_match(
+    catalog_product: ProductResult,
+    web_results: List[Dict[str, Any]],
+) -> tuple[Optional[str], Optional[float]]:
+    """
+    Simple heuristic: Pick result with most precise price (most decimal places).
+    
+    Rationale:
+    - More sig figs = more specific product match (e.g., $12.99 > $100.0 > $20)
+    - Trusts Brave API's relevance ranking (results already sorted by relevance)
+    - If prices tie on precision, first result wins (highest Brave ranking)
+    
+    Returns (purchase_url, web_price) tuple.
+    """
+    if not web_results:
+        return None, None
+    
+    best_match = None
+    best_precision = -1
+    
+    for result in web_results:
+        url = result.get("url")
+        price = result.get("price")
+        
+        if not url or price is None:
+            continue
+        
+        # Count decimal places as proxy for price precision
+        price_str = str(float(price))
+        if '.' in price_str:
+            decimals = len(price_str.rstrip('0').split('.')[1]) if '.' in price_str.rstrip('0') else 0
+        else:
+            decimals = 0
+        
+        # Pick result with most precise price (or first if tie, trusting Brave ranking)
+        if decimals > best_precision:
+            best_precision = decimals
+            best_match = (url, price)
+            print(f"[RETRIEVER] Match candidate: {result.get('title')[:50]}... (price: ${price}, precision: {decimals} decimals)")
+    
+    return best_match if best_match else (None, None)
+
+
 def run_retriever(
     state: AgentState,
     llm: Any,
     mcp_client: MCPHTTPClient,
 ) -> AgentState:
-    """LangGraph node: call rag.search and web.search via MCP, then rerank."""
+    """
+    LangGraph node: TRUE RECONCILIATION APPROACH
+    
+    1. Get 3 products from private catalog (the recommendations)
+    2. For EACH product, search web for live purchase link
+    3. Attach best matching URL + price to each catalog product
+    """
 
     query = state.get("user_query", "")
     intent = state.get("intent")
@@ -255,32 +378,78 @@ def run_retriever(
     results: List[ProductResult] = []
     tool_calls: List[ToolCallLog] = state.get("tool_calls", [])
 
+    # Step 1: Get recommended products from private catalog (limit to 3 for reconciliation)
+    max_catalog_results = 3 if (plan and plan.data_sources.use_live) else (plan.max_results if plan else 5)
     private_results, private_logs = _retrieve_private(query, constraints, plan, mcp_client)
-    results.extend(private_results)
+    private_results = private_results[:max_catalog_results]  # Limit to 3 for reconciliation
     tool_calls.extend(private_logs)
+    
+    print(f"[RETRIEVER] Retrieved {len(private_results)} products from catalog")
 
-    if plan and plan.data_sources.use_live:
-        print(f"[RETRIEVER] use_live=True, calling web.search")
-        web_results, web_logs = _retrieve_web(query, constraints, plan, mcp_client)
-        results.extend(web_results)
-        tool_calls.extend(web_logs)
-        print(f"[RETRIEVER] Retrieved {len(web_results)} products from web")
+    # Step 2: If use_live, reconcile each catalog product with web search
+    if plan and plan.data_sources.use_live and private_results:
+        print(f"[RETRIEVER] use_live=True, reconciling {len(private_results)} products with web search")
+        
+        for product in private_results:
+            # Extract structured search params for this product using LLM
+            print(f"[RETRIEVER] Extracting search params for: {product.title[:60]}...")
+            product_params = _extract_product_search_params(product, llm)
+            
+            # Use the proven _construct_web_query function
+            search_query = _construct_web_query("", product_params)
+            
+            print(f"[RETRIEVER] Web search query: '{search_query}'")
+            
+            # Call web search for this specific product (increased to 10 for better results)
+            args = {"query": search_query, "max_results": 10}
+            timestamp = datetime.utcnow().isoformat()
+            
+            try:
+                raw_response = mcp_client.call_tool("web.search", args)
+                web_items = raw_response.get("results", []) if isinstance(raw_response, dict) else []
+                
+                # Find best matching web result
+                purchase_url, web_price = _find_best_web_match(product, web_items)
+                
+                if purchase_url:
+                    product.purchase_url = purchase_url
+                    product.web_price = web_price
+                    print(f"[RETRIEVER] ✓ Found purchase link for {product.title}: {purchase_url}")
+                else:
+                    print(f"[RETRIEVER] ✗ No matching purchase link found for {product.title}")
+                
+                tool_calls.append(
+                    ToolCallLog(
+                        agent_name="retriever",
+                        tool_name="web.search",
+                        arguments=args,
+                        timestamp=timestamp,
+                        raw_response=raw_response,
+                    )
+                )
+            except Exception as e:
+                print(f"[RETRIEVER ERROR] Web search failed for {product.title}: {e}")
+        
+        results = private_results
     else:
-        print(f"[RETRIEVER] Skipping web search (plan={plan is not None}, use_live={plan.data_sources.use_live if plan else None})")
+        print(f"[RETRIEVER] Skipping reconciliation (use_live={plan.data_sources.use_live if plan else None})")
+        results = private_results
 
     if plan and plan.rerank and results:
         results = _rerank_results(query, results, llm)
 
     logs = state.get("agent_logs", [])
+    reconciled_count = sum(1 for r in results if r.purchase_url)
     logs.append(
         AgentLog(
             agent_name="retriever",
             timestamp=datetime.utcnow().isoformat(),
-            reasoning=f"Retriever fetched {len(results)} products from private and optional web sources.",
+            reasoning=f"Retriever fetched {len(results)} products from catalog and reconciled {reconciled_count} with live purchase links.",
             decision={
                 "plan": plan_dict,
                 "num_results": len(results),
-                "sources": sorted({r.source for r in results}),
+                "reconciled": reconciled_count,
+                "sources": ["private_with_live_links" if reconciled_count > 0 else "private"],
             },
             confidence=0.9,
         )

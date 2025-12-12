@@ -62,10 +62,25 @@ def _build_payload(state: AgentState) -> Dict[str, Any]:
     intent = state.get("intent")
     constraints = intent.constraints.to_dict() if intent else {}
 
+    # Normalize products: use web_price as THE price if available
+    # This prevents LLM confusion between catalog price and web price
+    products_dict = []
+    for p in products:
+        p_dict = p.to_dict()
+        
+        # If web_price exists, replace price with it
+        if p_dict.get('web_price') is not None:
+            p_dict['price'] = p_dict['web_price']
+        
+        # Remove web_price field to avoid LLM seeing both prices
+        p_dict.pop('web_price', None)
+        
+        products_dict.append(p_dict)
+
     return {
         "user_query": state.get("user_query", ""),
         "constraints": constraints,
-        "products": [p.to_dict() for p in products],
+        "products": products_dict,
     }
 
 
