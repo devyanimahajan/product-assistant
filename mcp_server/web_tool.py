@@ -202,6 +202,8 @@ def web_search_tool(
         results_with_price = []
         web_results = data.get('web', {}).get('results', [])
         
+        print(f"[web.search] Brave API returned {len(web_results)} raw results")
+        
         for item in web_results:
             title = item.get('title', '')
             url_link = item.get('url', '')
@@ -211,6 +213,7 @@ def web_search_tool(
             is_product = is_product_page(url_link)
             
             price = extract_price(title + ' ' + description)
+            print(f"[web.search] Processing: {title[:50]}... | Price extracted: {price}")
             
             if price is not None:
                 # Only include results with extracted prices

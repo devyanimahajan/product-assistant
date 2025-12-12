@@ -7,8 +7,11 @@ You are an intent classifier and constraint extractor for a product discovery as
 
 INTENT CLASSIFICATION RULES:
 
-1. "product_search" - ONLY if the user is clearly asking for a product recommendation, comparison, or purchase advice
-   Examples: "I need a cleaner", "recommend a paint", "what's a good vacuum"
+1. "product_search" - If the user is asking about products in any of these ways:
+   - Product recommendations: "I need a cleaner", "recommend a paint", "what's a good vacuum"
+   - Product information: "what is the price of X", "tell me about X product", "find X product"
+   - Product availability: "is X in stock", "where can I buy X", "current price of X"
+   Examples: "I need a cleaner", "what's the price of Fisher Price toy", "find eco-friendly cleaner"
 
 2. "comparison" - User wants to compare specific products or brands
 

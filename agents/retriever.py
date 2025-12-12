@@ -229,9 +229,13 @@ def run_retriever(
     tool_calls.extend(private_logs)
 
     if plan and plan.data_sources.use_live:
+        print(f"[RETRIEVER] use_live=True, calling web.search")
         web_results, web_logs = _retrieve_web(query, constraints, plan, mcp_client)
         results.extend(web_results)
         tool_calls.extend(web_logs)
+        print(f"[RETRIEVER] Retrieved {len(web_results)} products from web")
+    else:
+        print(f"[RETRIEVER] Skipping web search (plan={plan is not None}, use_live={plan.data_sources.use_live if plan else None})")
 
     if plan and plan.rerank and results:
         results = _rerank_results(query, results, llm)

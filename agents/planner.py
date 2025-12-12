@@ -17,8 +17,14 @@ def _should_use_live(user_query: str) -> bool:
         "today",
         "right now",
         "price today",
+        "price",  # Any price query should check web for current pricing
+        "cost",   # Similar to price
     ]
-    return any(word in lower for word in trigger_words)
+    should_use = any(word in lower for word in trigger_words)
+    print(f"[PLANNER] Checking live search trigger for query: '{user_query}'")
+    print(f"[PLANNER] Trigger words found: {[word for word in trigger_words if word in lower]}")
+    print(f"[PLANNER] use_live = {should_use}")
+    return should_use
 
 
 def _build_filters(intent: Any | None) -> Dict[str, Any]:
@@ -49,6 +55,8 @@ def run_planner(state: AgentState) -> AgentState:
 
     use_live = _should_use_live(user_query)
     filters = _build_filters(intent)
+
+    print(f"[PLANNER] Building plan with use_live={use_live}")
 
     data_sources = DataSourcePlan(
         use_private=True,

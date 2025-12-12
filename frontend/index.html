@@ -662,10 +662,10 @@
         // Agent Timeline Component
         function AgentTimeline({ logs, currentState }) {
             const agents = [
-                { name: 'router', label: 'Router', description: 'Classifying intent and extracting constraints' },
-                { name: 'planner', label: 'Planner', description: 'Building retrieval strategy' },
-                { name: 'retriever', label: 'Retriever', description: 'Searching product catalog' },
-                { name: 'answerer', label: 'Answerer', description: 'Generating recommendation' }
+                { name: 'router', label: 'Understanding Request', description: 'Understanding your request...' },
+                { name: 'planner', label: 'Planning Search', description: 'Planning product search...' },
+                { name: 'retriever', label: 'Finding Products', description: 'Looking through our catalog...' },
+                { name: 'answerer', label: 'Preparing Response', description: 'Preparing your recommendation...' }
             ];
 
             const getAgentStatus = (agentName) => {
@@ -692,7 +692,20 @@
                 const log = logs.find(l => 
                     l.agent_name && l.agent_name.toLowerCase() === agent.name.toLowerCase()
                 );
-                return log ? (log.reasoning || agent.description) : agent.description;
+                
+                // Return user-friendly description instead of technical reasoning
+                if (log) {
+                    // Agent completed - show completion message
+                    const friendlyMessages = {
+                        'router': 'Understood your request',
+                        'planner': 'Search strategy ready',
+                        'retriever': 'Found products in catalog',
+                        'answerer': 'Recommendation prepared'
+                    };
+                    return friendlyMessages[agent.name] || agent.description;
+                }
+                
+                return agent.description;
             };
 
             return (
@@ -754,7 +767,7 @@
                             
                             {product.doc_id && (
                                 <div className="citation">
-                                    Source: {product.source} | ID: {product.doc_id}
+                                    From our catalog
                                 </div>
                             )}
                         </div>
